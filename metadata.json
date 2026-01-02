@@ -1,0 +1,5 @@
+{
+  "name": "React Slide Deck Framework",
+  "description": "Interactive Slide Deck framework with Firebase CMS, PDF generation, and Google Auth integration.",
+  "requestFramePermissions": []
+}
