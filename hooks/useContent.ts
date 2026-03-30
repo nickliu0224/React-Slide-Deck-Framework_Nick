@@ -10,11 +10,17 @@ export const useContent = (isAdmin: boolean) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Determine collection path. In a real app, this might be dynamic.
     const collectionRef = collection(db, 'content');
 
-    // Subscribe to Firestore updates
+    // Fallback to local data if Firebase doesn't respond within 4 seconds
+    const timeout = setTimeout(() => {
+      setSlides(defaultSlides);
+      setError("Firebase unavailable. Using local data.");
+      setLoading(false);
+    }, 4000);
+
     const unsubscribe = onSnapshot(collectionRef, async (snapshot) => {
+      clearTimeout(timeout);
       try {
         if (snapshot.empty) {
             // AUTO-REPAIR: If DB is empty, seed with default data
@@ -28,23 +34,29 @@ export const useContent = (isAdmin: boolean) => {
             // Snapshot will fire again after write, so no need to setSlides here manually
         } else {
           const loadedSlides: Slide[] = snapshot.docs.map(doc => doc.data() as Slide);
-          // Sort by slide ID or add a 'order' field. 
+          // Sort by slide ID or add a 'order' field.
           // For simplicity, we assume ID order or insert order matches for now.
           // A robust system would have an 'order' field.
-          loadedSlides.sort((a, b) => a.id.localeCompare(b.id)); 
+          loadedSlides.sort((a, b) => a.id.localeCompare(b.id));
           setSlides(loadedSlides);
         }
         setLoading(false);
       } catch (err: any) {
         console.error("Error fetching slides:", err);
-        // Fallback to local data if Firebase fails (e.g., missing permissions or offline)
+        clearTimeout(timeout);
         setSlides(defaultSlides);
         setError("Failed to sync with cloud. Using local backup.");
         setLoading(false);
       }
+    }, (err) => {
+      console.error("Firestore connection error:", err);
+      clearTimeout(timeout);
+      setSlides(defaultSlides);
+      setError("Failed to connect to cloud. Using local backup.");
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => { unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   const updateSlide = async (slide: Slide) => {
